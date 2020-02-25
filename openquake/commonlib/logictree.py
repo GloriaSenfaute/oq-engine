@@ -54,6 +54,10 @@ MIN_SINT_32 = -(2 ** 31)
 #: Maximum value for a seed number
 MAX_SINT_32 = (2 ** 31) - 1
 
+U8 = numpy.uint8
+U16 = numpy.uint16
+U32 = numpy.uint32
+
 TRT_REGEX = re.compile(r'tectonicRegion="([^"]+?)"')
 ID_REGEX = re.compile(r'id="([^"]+?)"')
 SOURCE_TYPE_REGEX = re.compile(r'<(\w+Source)\b')
@@ -1109,6 +1113,36 @@ class SourceModelLogicTree(object):
             arr[rlz.ordinal] = (rlz.ordinal, rlz.lt_path, rlz.weight,
                                 rlz.value, rlz.samples)
         return arr
+
+    def get_rlzs_assoc(self, gsim_lt):
+        """
+        :returns: two arrays rlzs and assocs
+        """
+        assocs = []  # rlz_id, grp_id, gsim_id
+        smlt_rlzs = get_effective_rlzs(self)
+        gsim_rlzs = get_effective_rlzs(gsim_lt)
+        n = len(smlt_rlzs)
+        gsim_id = {}
+        for trt, gsims in gsim_lt.values.items():
+            for g, gsim in enumerate(gsims):
+                gsim_id[trt, gsim] = g
+        i = 0
+        for rlz in smlt_rlzs:
+            if self.num_samples:
+                gsim_rlzs = gsim_lt.sample(
+                    rlz.samples, self.seed + rlz.ordinal)
+            for gsim_rlz in gsim_rlzs:
+                trt_gsim = zip(gsim_lt.values, gsim_rlz.value)
+                for trti, (trt, gsim) in enumerate(trt_gsim):
+                    assocs.append(
+                        (i, n * trti + rlz.ordinal, gsim_id[trt, gsim]))
+                i += 1
+        arr = numpy.zeros(len(smlt_rlzs), rlz_dt)
+        for rlz in smlt_rlzs:
+            arr[rlz.ordinal] = (rlz.ordinal, rlz.lt_path, rlz.weight,
+                                rlz.value, rlz.samples)
+        return arr, numpy.array(
+            assocs, [('rlz_id', U32), ('grp_id', U16), ('gsim_id', U8)])
 
     def get_trti_eri(self):
         """
